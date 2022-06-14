@@ -6,8 +6,7 @@
             [app.subs]
             [cljs.core.match :refer [match]]
             [cljs.core.async :refer [go <!]]
-            [app.events]
-            [cljs-http.client :as http]))
+            [app.events]))
 
 (def homeScreen (r/adapt-react-class ui/Home))
 (def getAddressScreen (r/adapt-react-class ui/GetCep))
@@ -20,11 +19,6 @@
                                  "Implement function to delete a task."
                                  "Figure how to update an atom that contains a Javascript array"])))
 
-(def inputValue (r/atom "0"))
-
-(defn changeInputValue [prop]
-  (reset! inputValue #(merge % prop)))
-
 (defn home [props]
   [homeScreen (merge props {:title "Welcome to the Home Screen"
                             :navigate #(rf/dispatch [:set-screen :second])
@@ -32,16 +26,21 @@
 
 (def responseAPI (r/atom nil))
 
+(defn getAddress [value]
+  (go
+    (try
+      (<! (-> (.fetch js/window (str "https://ws.apicep.com/cep/" (-> value) ".json"))
+              (.then #(.json %))
+              (.then #(reset! responseAPI %))
+              (.then #(js/console.log value))))
+      (catch :default e
+        e))))
+
 (defn getCep [props]
   [getAddressScreen (merge props {:title "Welcome to the Address finder"
-
-                                  :navigate #(go (let [response (<! (http/get "https://viacep.com.br/ws/59649899/json"
-                                                                              {:async? true}))]
-                                                   (reset! responseAPI response)
-                                                   (js/console.info @responseAPI)))
-                                  :inputValue @inputValue
-                                  :setInputValue changeInputValue})])
-
+                                  :navigate #(rf/dispatch [:set-screen :first])
+                                  :getAddress getAddress
+                                  :address @responseAPI})])
 ;; Navigation 
 (defn main* []
   (let [screen @(rf/subscribe [:get-screen])
