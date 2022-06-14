@@ -4,59 +4,50 @@
             [reagent.react-native :as rn]
             [re-frame.core :as rf]
             [app.subs]
+            [cljs.core.match :refer [match]]
+            [cljs.core.async :refer [go <!]]
             [app.events]
-            [cljs.core.match :refer [match]]))
-
-;; (def result (r/atom 0))
-;; (def input1 (r/atom 1))
-;; (def input2 (r/atom 1))
+            [cljs-http.client :as http]))
 
 (def homeScreen (r/adapt-react-class ui/Home))
-(def card (r/adapt-react-class ui/Card))
-;; (def operators (r/adapt-react-class ui/OperatorsContainer))
-;; (def calculator (r/adapt-react-class ui/Calculator))
+(def getAddressScreen (r/adapt-react-class ui/GetCep))
 
-;; (defn input [value]
-;;   [(r/adapt-react-class ui/Input)
-;;    {:text (str value)}])
+(def tasks (r/atom (apply array ["Create new screen on Storybook."
+                                 "Use the created screen on CLJS."
+                                 "Implement listing on CLJS to render the tasks card."
+                                 "Implement an identifier on each task to be able to manipulate it."
+                                 "Implement function to mark a task as checked."
+                                 "Implement function to delete a task."
+                                 "Figure how to update an atom that contains a Javascript array"])))
 
-;; HADLERS
-;; (defn handle-plus []
-;;   #(rf/dispatch [:addition]))
+(def inputValue (r/atom "0"))
 
-;; (defn handle-minus []
-;;   (js/console.info @(rf/subscribe [:get-result])))
-;; (defn handle-multiply []
-;;   (js/console.info (+ @input1 @input2)))
-
-(defn tasks [props]
-  [rn/view {:styles {:padding 12}}
-   [card (merge props {:title "Task 1"})]
-   [card (merge props {:title "Task 2"})]
-   [card (merge props {:title "Task 3"})]
-   [card (merge props {:title "Task 4"})]])
-
+(defn changeInputValue [prop]
+  (reset! inputValue #(merge % prop)))
 
 (defn home [props]
   [homeScreen (merge props {:title "Welcome to the Home Screen"
                             :navigate #(rf/dispatch [:set-screen :second])
-                            :children tasks})
-   [tasks]])
+                            :tasks @tasks})])
 
+(def responseAPI (r/atom nil))
 
-;;  [rn/button {:title "-->"
-;;              :on-press #(rf/dispatch [:set-screen :second])}]
-;; [rn/button {:title "<--"
-;;             :on-press #(rf/dispatch [:set-screen :first])}]
+(defn getCep [props]
+  [getAddressScreen (merge props {:title "Welcome to the Address finder"
 
-(defn blank [props]
-  [homeScreen (merge props {:title "Welcome to the Blank Screen" :navigate #(rf/dispatch [:set-screen :first])})])
+                                  :navigate #(go (let [response (<! (http/get "https://viacep.com.br/ws/59649899/json"
+                                                                              {:async? true}))]
+                                                   (reset! responseAPI response)
+                                                   (js/console.info @responseAPI)))
+                                  :inputValue @inputValue
+                                  :setInputValue changeInputValue})])
+
 ;; Navigation 
 (defn main* []
   (let [screen @(rf/subscribe [:get-screen])
         view   (match screen
                  :first [home]
-                 :second [blank])]
+                 :second [getCep])]
     [rn/view {:flex 1 :align-items "center" :justify-content "center"}
      view]))
 
